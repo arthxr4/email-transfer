@@ -9,9 +9,8 @@ app = FastAPI()
 def send_email(smtp_address: str, smtp_port: int, username: str, password: str, receiver_address: str):
     """Endpoint to send a simple 'Hello World' email."""
     try:
-        # Configuration du serveur SMTP
-        server = smtplib.SMTP(smtp_address, smtp_port)
-        server.starttls()  # Activation de la sécurisation de la connexion
+        # Configuration du serveur SMTP avec SSL
+        server = smtplib.SMTP_SSL(smtp_address, smtp_port)
         server.login(username, password)  # Connexion au serveur SMTP
 
         # Création du message
