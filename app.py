@@ -31,10 +31,31 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
     try:
         result, data = mail.uid('fetch', uid, '(RFC822)')
         if result != 'OK' or not data[0]:
+            print("Failed to fetch the email.")
             raise HTTPException(status_code=404, detail="Email not found")
 
         raw_email = data[0][1]
         email_msg = message_from_bytes(raw_email)
+        content = None
+
+        if email_msg.is_multipart():
+            for part in email_msg.walk():
+                print(f"Checking part: {part.get_content_type()}")
+                if part.get_content_type() == 'text/plain':
+                    payload = part.get_payload(decode=True)
+                    if payload:
+                        content = payload.decode(part.get_content_charset() or 'utf-8')
+                        print("Content found and decoded.")
+                        break
+        else:
+            payload = email_msg.get_payload(decode=True)
+            if payload:
+                content = payload.decode(email_msg.get_content_charset() or 'utf-8')
+                print("Single-part content found and decoded.")
+
+        if not content:
+            print("No content was decoded; defaulting to placeholder.")
+            content = "Original message content not available."
 
         smtp_server = connect_to_smtp(smtp_address, smtp_port, username, password)
         forward_msg = MIMEMultipart("alternative")
@@ -44,13 +65,11 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         forward_msg['In-Reply-To'] = email_msg.get('Message-ID')
         forward_msg['References'] = email_msg.get('References', email_msg.get('Message-ID'))
 
-        # Personal message at the top
-        personal_msg_part = MIMEText(f"test: {personal_message}<br><br>", 'html')
+        personal_msg_part = MIMEText(f"test: {personal_message}\n\n", 'plain')
         forward_msg.attach(personal_msg_part)
 
-        # Quoted content as HTML
-        quoted_content = "<blockquote>" + "\n".join([f"{line}<br>" for line in email_msg.get_payload(decode=True).splitlines()]) + "</blockquote>"
-        quoted_part = MIMEText(quoted_content, 'html')
+        quoted_content = "\n".join([f"> {line}" for line in content.splitlines()])
+        quoted_part = MIMEText(quoted_content, 'plain')
         forward_msg.attach(quoted_part)
 
         smtp_server.send_message(forward_msg)
@@ -58,6 +77,7 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
 
         return {"status": "success", "message": "Email fetched and replied with personal message successfully"}
     except Exception as e:
+        print(f"An error occurred: {e}")
         return {"status": "error", "message": str(e)}
     finally:
         mail.logout()
