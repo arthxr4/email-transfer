@@ -21,7 +21,7 @@ def fetch_email_thread(imap_address: str, username: str, password: str, email_ui
     try:
         mail = connect_to_imap(imap_address, username, password)
         result, data = mail.uid('fetch', email_uid, '(RFC822)')
-        if result != 'OK':
+        if result != 'OK' or not data[0]:
             return {"status": "failure", "message": "Email not found"}
 
         raw_email = data[0][1]
@@ -33,7 +33,7 @@ def fetch_email_thread(imap_address: str, username: str, password: str, email_ui
             "from": msg.get('From'),
             "subject": msg.get('Subject'),
             "date": msg.get('Date'),
-            "body_html": msg.get_payload(decode=True).decode('utf-8', errors='ignore')
+            "body_html": msg.get_payload(decode=True).decode('utf-8', errors='ignore') if msg.get_payload(decode=True) else ''
         }
         thread_emails.append(email_data)
 
@@ -41,20 +41,21 @@ def fetch_email_thread(imap_address: str, username: str, password: str, email_ui
         references = msg.get('References', '').split() + msg.get('In-Reply-To', '').split()
         unique_ids = set(references)
         for ref_id in unique_ids:
-            search_result, search_data = mail.uid('search', None, f'(HEADER Message-ID "{ref_id}")')
-            if search_result == 'OK':
-                for ref_uid in search_data[0].split():
-                    result, data = mail.uid('fetch', ref_uid, '(RFC822)')
-                    if result == 'OK':
-                        ref_email = BytesParser().parsebytes(data[0][1])
-                        email_data = {
-                            "uid": ref_uid.decode('utf-8'),
-                            "from": ref_email.get('From'),
-                            "subject": ref_email.get('Subject'),
-                            "date": ref_email.get('Date'),
-                            "body_html": ref_email.get_payload(decode=True).decode('utf-8', errors='ignore')
-                        }
-                        thread_emails.append(email_data)
+            if ref_id:
+                search_result, search_data = mail.uid('search', None, f'(HEADER Message-ID "{ref_id}")')
+                if search_result == 'OK' and search_data[0]:
+                    for ref_uid in search_data[0].split():
+                        result, data = mail.uid('fetch', ref_uid.decode('utf-8'), '(RFC822)')
+                        if result == 'OK' and data[0]:
+                            ref_email = BytesParser().parsebytes(data[0][1])
+                            email_data = {
+                                "uid": ref_uid.decode('utf-8'),
+                                "from": ref_email.get('From'),
+                                "subject": ref_email.get('Subject'),
+                                "date": ref_email.get('Date'),
+                                "body_html": ref_email.get_payload(decode=True).decode('utf-8', errors='ignore') if ref_email.get_payload(decode=True) else ''
+                            }
+                            thread_emails.append(email_data)
 
         if not thread_emails:
             return {"status": "failure", "message": "No email found with the provided UID."}
@@ -67,4 +68,3 @@ def fetch_email_thread(imap_address: str, username: str, password: str, email_ui
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
