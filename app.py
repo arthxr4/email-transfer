@@ -38,9 +38,11 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
 
         smtp_server = connect_to_smtp(smtp_address, smtp_port, username, password)
         forward_msg = MIMEMultipart("alternative")
-        forward_msg['From'] = username
+        forward_msg['From'] = email_msg.get('From')
         forward_msg['To'] = receiver_address
         forward_msg['Subject'] = "RE: " + email_msg.get('Subject', '')
+        forward_msg['Date'] = email_msg.get('Date')
+        forward_msg['Reply-To'] = email_msg.get('Reply-To', email_msg.get('From'))
         forward_msg['In-Reply-To'] = email_msg.get('Message-ID')
         forward_msg['References'] = email_msg.get('References', email_msg.get('Message-ID'))
 
