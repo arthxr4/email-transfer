@@ -29,7 +29,6 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
     """Endpoint to fetch an HTML email content by UID and send it as a reply with a personal message to another email address."""
     mail = connect_to_imap(imap_address, username, password)
     try:
-        # Fetch the full email including headers
         result, data = mail.uid('fetch', uid, '(RFC822)')
         if result != 'OK' or not data[0]:
             raise HTTPException(status_code=404, detail="Email not found")
@@ -40,19 +39,13 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         original_message_id = msg.get('Message-ID')
         references = msg.get('References', '')
         if references:
-            references += ' ' + original_message_id  # Append the original message-id to the references if it exists
+            references += ' ' + original_message_id
         else:
             references = original_message_id
 
-        html_content = None
-        for part in msg.walk():
-            if part.get_content_type() == 'text/html':
-                html_content = part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
-                break
-
         # Connect to SMTP and send the email
         smtp_server = connect_to_smtp(smtp_address, smtp_port, username, password)
-        forward_msg = MIMEMultipart("alternative")
+        forward_msg = MIMEMultipart("mixed")
         forward_msg['From'] = username
         forward_msg['To'] = receiver_address
         forward_msg['Subject'] = "RE: " + msg.get('Subject', '')
@@ -60,11 +53,11 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         forward_msg['References'] = references
 
         # Personal message
-        personal_msg = MIMEText(personal_message, 'plain')
-        forward_msg.attach(personal_msg)
+        intro_part = MIMEText(personal_message, 'plain')
+        forward_msg.attach(intro_part)
 
-        # Original email content
-        html_part = MIMEText(html_content, 'html')
+        # Encapsulate the original HTML content into a new MIME part
+        html_part = MIMEText(msg.get_payload(decode=True), 'html')
         forward_msg.attach(html_part)
 
         smtp_server.send_message(forward_msg)
