@@ -35,18 +35,6 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
 
         raw_email = data[0][1]
         email_msg = message_from_bytes(raw_email)
-        content = None
-
-        if email_msg.is_multipart():
-            for part in email_msg.walk():
-                if part.get_content_type() == 'text/plain':
-                    content = part.get_payload(decode=True).decode(part.get_content_charset('utf-8') or 'utf-8')
-                    break  # Assumes that the first text/plain part is the main content
-        else:
-            content = email_msg.get_payload(decode=True).decode(email_msg.get_content_charset('utf-8') or 'utf-8')
-
-        if content is None:
-            content = "No readable content was found in the email."
 
         smtp_server = connect_to_smtp(smtp_address, smtp_port, username, password)
         forward_msg = MIMEMultipart("alternative")
@@ -56,11 +44,13 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         forward_msg['In-Reply-To'] = email_msg.get('Message-ID')
         forward_msg['References'] = email_msg.get('References', email_msg.get('Message-ID'))
 
-        personal_msg_part = MIMEText(f"test: {personal_message}\n\n", 'plain')
+        # Personal message at the top
+        personal_msg_part = MIMEText(f"test: {personal_message}<br><br>", 'html')
         forward_msg.attach(personal_msg_part)
 
-        quoted_content = "\n".join([f"> {line}" for line in content.splitlines()])
-        quoted_part = MIMEText(quoted_content, 'plain')
+        # Quoted content as HTML
+        quoted_content = "<blockquote>" + "\n".join([f"{line}<br>" for line in email_msg.get_payload(decode=True).splitlines()]) + "</blockquote>"
+        quoted_part = MIMEText(quoted_content, 'html')
         forward_msg.attach(quoted_part)
 
         smtp_server.send_message(forward_msg)
