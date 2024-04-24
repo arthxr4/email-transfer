@@ -4,22 +4,32 @@ import logging
 
 app = FastAPI()
 
-# Set up logging
+# Configurer le logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-@app.get("/fetch-email-html")
-def fetch_email_html(imap_address: str, username: str, password: str, email_uid: str):
-    """Endpoint to fetch the HTML content of an email by UID."""
+@app.get("/fetch-latest-email")
+def fetch_latest_email(imap_address: str, username: str, password: str):
+    """Endpoint to fetch the latest email received."""
     try:
         with Imbox(imap_address, username=username, password=password, ssl=True) as imbox:
-            # Fetch email by UID
-            messages = imbox.messages(uid=email_uid)
+            # Fetch all messages and sort by date in descending order to get the latest
+            messages = imbox.messages(sort_by='date', reversed=True)
             for uid, message in messages:
-                html_content = message.body.get('html', [])[0] if message.body.get('html') else "No HTML content available"
-                return {"status": "success", "uid": uid, "html_content": html_content}
-            return {"status": "failure", "message": "No email found with the provided UID."}
+                # Extracting detailed information from the latest email
+                email_data = {
+                    "uid": uid,
+                    "from": message.sent_from,
+                    "to": message.sent_to,
+                    "subject": message.subject,
+                    "date": message.date,
+                    "headers": message.headers,
+                    "html_body": message.body['html'][0] if message.body['html'] else "No HTML content available",
+                    "text_body": message.body['plain'][0] if message.body['plain'] else "No text content available"
+                }
+                return {"status": "success", "email": email_data}
+            return {"status": "failure", "message": "No emails found."}
     except Exception as e:
-        logging.error("An error occurred while trying to fetch the email:", exc_info=True)
+        logging.error("An error occurred while trying to fetch the latest email:", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
