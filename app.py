@@ -25,7 +25,7 @@ def connect_to_smtp(smtp_address, smtp_port, username, password):
         raise HTTPException(status_code=500, detail=f"SMTP login failed: {e}")
 
 @app.post("/fetch-and-send-email-as-reply/")
-def fetch_and_send_email_as_reply(imap_address: str, username: str, password: str, uid: str, smtp_address: str, smtp_port: int, receiver_address: str, personal_message: str):
+async def fetch_and_send_email_as_reply(imap_address: str, username: str, password: str, uid: str, smtp_address: str, smtp_port: int, receiver_address: str, personal_message: str):
     """Endpoint to fetch an email by UID and send it as a reply with a personal message to another email address."""
     mail = connect_to_imap(imap_address, username, password)
     try:
@@ -34,37 +34,28 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
             raise HTTPException(status_code=404, detail="Email not found")
 
         raw_email = data[0][1]
-        email_msg = message_from_bytes(raw_email)
+        msg = message_from_bytes(raw_email)
 
         smtp_server = connect_to_smtp(smtp_address, smtp_port, username, password)
         forward_msg = MIMEMultipart("alternative")
         forward_msg['From'] = username
         forward_msg['To'] = receiver_address
-        forward_msg['Subject'] = "RE: " + email_msg.get('Subject', '')
-        forward_msg['In-Reply-To'] = email_msg.get('Message-ID')
-        forward_msg['References'] = email_msg.get('References', email_msg.get('Message-ID'))
+        forward_msg['Subject'] = "RE: " + msg.get('Subject', '')
+        forward_msg['In-Reply-To'] = msg.get('Message-ID')
+        forward_msg['References'] = msg.get('References', msg.get('Message-ID'))
+        forward_msg['Reply-To'] = msg.get('From')  # Ensure replies go to the original sender
 
         personal_msg_part = MIMEText(f"test: {personal_message}\n\n", 'html')
         forward_msg.attach(personal_msg_part)
 
-        # Prepare and append the HTML content of the original email
-        if email_msg.is_multipart():
-            for part in email_msg.walk():
+        if msg.is_multipart():
+            for part in msg.walk():
                 if part.get_content_type() == 'text/html':
                     html_content = part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
-                    break
+                    forward_msg.attach(MIMEText(html_content, 'html'))
         else:
-            if email_msg.get_content_type() == 'text/html':
-                html_content = email_msg.get_payload(decode=True).decode(email_msg.get_content_charset('iso-8859-1'), errors='replace')
-
-        if html_content:
-            html_formatted_content = f"<blockquote style='border-left: 2px solid gray; margin-left: 10px; padding-left: 10px;'>{html_content}</blockquote>"
-            quoted_part = MIMEText(html_formatted_content, 'html')
-            forward_msg.attach(quoted_part)
-        else:
-            fallback_text = "Original message content not available in HTML format."
-            fallback_part = MIMEText(fallback_text, 'plain')
-            forward_msg.attach(fallback_part)
+            html_content = msg.get_payload(decode=True).decode(msg.get_content_charset('iso-8859-1'), errors='replace')
+            forward_msg.attach(MIMEText(html_content, 'html'))
 
         smtp_server.send_message(forward_msg)
         smtp_server.quit()
