@@ -7,14 +7,13 @@ app = FastAPI()
 # Configurer le logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-@app.get("/fetch-emails-from")
-def fetch_emails_from(imap_address: str, username: str, password: str, sender_email: str):
-    """Endpoint to fetch emails sent from a specific email address."""
+@app.get("/fetch-email-by-uid")
+def fetch_email_by_uid(imap_address: str, username: str, password: str, email_uid: str):
+    """Endpoint to fetch email details by UID."""
     try:
         with Imbox(imap_address, username=username, password=password, ssl=True) as imbox:
-            # Fetch emails sent from a specific email address
-            messages = imbox.messages(sent_from=sender_email)
-            emails = []
+            # Fetch a specific email by UID
+            messages = imbox.messages(uid=email_uid)
             for uid, message in messages:
                 email_info = {
                     "uid": uid,
@@ -23,16 +22,13 @@ def fetch_emails_from(imap_address: str, username: str, password: str, sender_em
                     "subject": message.subject,
                     "date": message.date,
                     "plain_body": message.body['plain'][0] if message.body['plain'] else "No plain text content available",
-                    "html_body": message.body['html'][0] if message.body['html'] else "No HTML content available"
+                    "html_body": message.body['html'][0] if message.body['html'] else "No HTML content available",
+                    "attachments": len(message.attachments)
                 }
-                emails.append(email_info)
-
-            if emails:
-                return {"status": "success", "emails": emails}
-            else:
-                return {"status": "failure", "message": "No emails found from the specified sender."}
+                return {"status": "success", "email": email_info}
+            return {"status": "failure", "message": "No email found with the provided UID."}
     except Exception as e:
-        logging.error("An error occurred while trying to fetch emails:", exc_info=True)
+        logging.error("An error occurred while trying to fetch the email:", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
