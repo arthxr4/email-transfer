@@ -36,22 +36,22 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         raw_email = data[0][1]
         msg = BytesParser().parsebytes(raw_email)
 
-        # Setup the email structure
         smtp_server = connect_to_smtp(smtp_address, smtp_port, username, password)
-        forward_msg = MIMEMultipart("mixed")
+        forward_msg = MIMEMultipart("alternative")
         forward_msg['From'] = username
         forward_msg['To'] = receiver_address
         forward_msg['Subject'] = "RE: " + msg.get('Subject', '')
         forward_msg['In-Reply-To'] = msg.get('Message-ID')
         forward_msg['References'] = msg.get('References', msg.get('Message-ID'))
 
-        # Attach the personal message at the top
+        # Personal message at the top
         personal_msg_part = MIMEText(f"test: {personal_message}\n\n", 'plain')
         forward_msg.attach(personal_msg_part)
 
-        # Attach the original email content as quoted text
-        original_content = f"\n\n--- Original Message ---\n{msg.get_payload(decode=True)}"
-        quoted_part = MIMEText(original_content, 'plain')
+        # Format the original email content as a quoted text
+        original_content = msg.get_payload(decode=True)
+        quoted_content = "\n".join([f"> {line}" for line in original_content.splitlines()])
+        quoted_part = MIMEText(quoted_content, 'plain')
         forward_msg.attach(quoted_part)
 
         smtp_server.send_message(forward_msg)
