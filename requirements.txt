@@ -3,3 +3,4 @@ fastapi
 uvicorn
 flask
 numpi
+matplotlib
