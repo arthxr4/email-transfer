@@ -36,40 +36,24 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         raw_email = data[0][1]
         msg = BytesParser().parsebytes(raw_email)
 
-        original_message_id = msg.get('Message-ID')
-        references = msg.get('References', '')
-        if references:
-            references += ' ' + original_message_id
-        else:
-            references = original_message_id
-
-        # Connect to SMTP and send the email
+        # Setup the email structure
         smtp_server = connect_to_smtp(smtp_address, smtp_port, username, password)
-        forward_msg = MIMEMultipart("alternative")
+        forward_msg = MIMEMultipart("mixed")
         forward_msg['From'] = username
         forward_msg['To'] = receiver_address
         forward_msg['Subject'] = "RE: " + msg.get('Subject', '')
-        forward_msg['In-Reply-To'] = original_message_id
-        forward_msg['References'] = references
+        forward_msg['In-Reply-To'] = msg.get('Message-ID')
+        forward_msg['References'] = msg.get('References', '')
 
-        # Attach the personal message
-        personal_msg_part = MIMEText(personal_message, 'plain')
+        # Creating a personal message part
+        personal_msg_part = MIMEText(f"test: {personal_message}\n\n", 'plain')
         forward_msg.attach(personal_msg_part)
 
-        # Attach the original email content
-        html_content = None
-        for part in msg.walk():
-            if part.get_content_type() == 'text/html':
-                html_content = part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
+        # Creating a copy of the original message part
+        original_msg_part = MIMEText(msg.get_payload(decode=True), 'html')
+        forward_msg.attach(original_msg_part)
 
-        if html_content:
-            html_part = MIMEText(html_content, 'html')
-            forward_msg.attach(html_part)
-        else:
-            print("No HTML part found; using plain text as fallback.")
-            text_part = MIMEText("Original message was in a format not supported here.", 'plain')
-            forward_msg.attach(text_part)
-
+        # Sending the email
         smtp_server.send_message(forward_msg)
         smtp_server.quit()
 
