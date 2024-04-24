@@ -7,20 +7,15 @@ app = FastAPI()
 # Configurer le logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-@app.get("/fetch-email")
-def fetch_email_content(imap_address: str, username: str, password: str, uid: str):
-    """Endpoint to fetch the HTML content of an email by UID."""
+@app.get("/test-imap-connection")
+def test_imap_connection(imap_address: str, username: str, password: str):
+    """Endpoint to test IMAP connection."""
     try:
         with Imbox(imap_address, username=username, password=password, ssl=True) as imbox:
-            messages = imbox.messages(uid=uid)  # Fetch specific UID
-            for uid, message in messages:
-                html_content = message.body['html'][0] if message.body['html'] else "No HTML content available"
-                return {"uid": uid, "html_content": html_content}
-        return {"message": "Email with specified UID not found"}
+            if imbox.connection:
+                return {"status": "success", "message": "Successfully connected to the IMAP server."}
+            else:
+                return {"status": "failure", "message": "Failed to connect to the IMAP server."}
     except Exception as e:
-        logging.error("An error occurred while trying to fetch the email:", exc_info=True)
+        logging.error("An error occurred while trying to connect to the IMAP server:", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
