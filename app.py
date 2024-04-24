@@ -43,26 +43,16 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         forward_msg['To'] = receiver_address
         forward_msg['Subject'] = "RE: " + msg.get('Subject', '')
         forward_msg['In-Reply-To'] = msg.get('Message-ID')
-        forward_msg['References'] = msg.get('References', '')
+        forward_msg['References'] = msg.get('References', msg.get('Message-ID'))
 
-        # Creating a personal message part
+        # Attach the personal message at the top
         personal_msg_part = MIMEText(f"test: {personal_message}\n\n", 'plain')
         forward_msg.attach(personal_msg_part)
 
-        # Check if HTML content exists
-        html_content = None
-        for part in msg.walk():
-            if part.get_content_type() == 'text/html':
-                html_content = part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
-        
-        if html_content:
-            html_part = MIMEText(html_content, 'html')
-            forward_msg.attach(html_part)
-        else:
-            # Fallback if no HTML content found
-            fallback_text = "Original message content not available in HTML format."
-            fallback_part = MIMEText(fallback_text, 'plain')
-            forward_msg.attach(fallback_part)
+        # Attach the original email content as quoted text
+        original_content = f"\n\n--- Original Message ---\n{msg.get_payload(decode=True)}"
+        quoted_part = MIMEText(original_content, 'plain')
+        forward_msg.attach(quoted_part)
 
         smtp_server.send_message(forward_msg)
         smtp_server.quit()
