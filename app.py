@@ -45,18 +45,18 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
 
         # Connect to SMTP and send the email
         smtp_server = connect_to_smtp(smtp_address, smtp_port, username, password)
-        forward_msg = MIMEMultipart("mixed")
+        forward_msg = MIMEMultipart("alternative")
         forward_msg['From'] = username
         forward_msg['To'] = receiver_address
         forward_msg['Subject'] = "RE: " + msg.get('Subject', '')
         forward_msg['In-Reply-To'] = original_message_id
         forward_msg['References'] = references
 
-        # Personal message
-        intro_part = MIMEText(personal_message, 'plain')
-        forward_msg.attach(intro_part)
+        # Attach the personal message
+        personal_msg_part = MIMEText(personal_message, 'plain')
+        forward_msg.attach(personal_msg_part)
 
-        # Encapsulate the original HTML content into a new MIME part
+        # Attach the original email content
         html_part = MIMEText(msg.get_payload(decode=True), 'html')
         forward_msg.attach(html_part)
 
