@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 import imaplib
-from email.parser import BytesParser
+from email import message_from_bytes
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -34,38 +34,33 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
             raise HTTPException(status_code=404, detail="Email not found")
 
         raw_email = data[0][1]
-        msg = BytesParser().parsebytes(raw_email)
+        email_msg = message_from_bytes(raw_email)
 
         smtp_server = connect_to_smtp(smtp_address, smtp_port, username, password)
         forward_msg = MIMEMultipart("alternative")
         forward_msg['From'] = username
         forward_msg['To'] = receiver_address
-        forward_msg['Subject'] = "RE: " + msg.get('Subject', '')
-        forward_msg['In-Reply-To'] = msg.get('Message-ID')
-        forward_msg['References'] = msg.get('References', msg.get('Message-ID'))
+        forward_msg['Subject'] = "RE: " + email_msg.get('Subject', '')
+        forward_msg['In-Reply-To'] = email_msg.get('Message-ID')
+        forward_msg['References'] = email_msg.get('References', email_msg.get('Message-ID'))
 
-        personal_msg_part = MIMEText(f"test: {personal_message}\n\n", 'plain')
+        personal_msg_part = MIMEText(f"test: {personal_message}\n\n", 'html')
         forward_msg.attach(personal_msg_part)
 
-        # Extract and append the HTML content
-        html_content = None
-        if msg.is_multipart():
-            for part in msg.walk():
+        # Format and append the HTML content
+        if email_msg.is_multipart():
+            for part in email_msg.walk():
                 if part.get_content_type() == 'text/html':
                     html_content = part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
-                    break
+                    html_formatted_content = f"<blockquote style='border-left: 2px solid gray; margin-left: 10px; padding-left: 10px;'>{html_content}</blockquote>"
+                    quoted_part = MIMEText(html_formatted_content, 'html')
+                    forward_msg.attach(quoted_part)
         else:
-            if msg.get_content_type() == 'text/html':
-                html_content = msg.get_payload(decode=True).decode(msg.get_content_charset('iso-8859-1'), errors='replace')
-
-        if html_content:
-            quoted_content = "<blockquote>" + html_content + "</blockquote>"
-            quoted_part = MIMEText(quoted_content, 'html')
-            forward_msg.attach(quoted_part)
-        else:
-            fallback_text = "Original message content not available in HTML format."
-            fallback_part = MIMEText(fallback_text, 'plain')
-            forward_msg.attach(fallback_part)
+            if email_msg.get_content_type() == 'text/html':
+                html_content = email_msg.get_payload(decode=True).decode(email_msg.get_content_charset('iso-8859-1'), errors='replace')
+                html_formatted_content = f"<blockquote style='border-left: 2px solid gray; margin-left: 10px; padding-left: 10px;'>{html_content}</blockquote>"
+                quoted_part = MIMEText(html_formatted_content, 'html')
+                forward_msg.attach(quoted_part)
 
         smtp_server.send_message(forward_msg)
         smtp_server.quit()
