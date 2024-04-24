@@ -27,17 +27,16 @@ def connect_to_smtp(smtp_address, smtp_port, username, password):
 @app.post("/fetch-and-send-email-as-reply/")
 def fetch_and_send_email_as_reply(imap_address: str, username: str, password: str, uid: str, smtp_address: str, smtp_port: int, receiver_address: str):
     """Endpoint to fetch an HTML email content by UID and send it as a reply to another email address."""
-    # Connect to IMAP and fetch the email
     mail = connect_to_imap(imap_address, username, password)
     try:
-        result, data = mail.uid('fetch', uid, '(RFC822 HEADER.FIELDS (MESSAGE-ID REFERENCES))')
+        # Fetch the full email including headers
+        result, data = mail.uid('fetch', uid, '(RFC822)')
         if result != 'OK' or not data[0]:
             raise HTTPException(status_code=404, detail="Email not found")
 
         raw_email = data[0][1]
         msg = BytesParser().parsebytes(raw_email)
 
-        # Get message-id and references to maintain the email thread
         original_message_id = msg.get('Message-ID')
         references = msg.get('References', '')
         if references:
@@ -51,7 +50,6 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
                 html_content = part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
                 break
 
-        # Connect to SMTP and send the email
         smtp_server = connect_to_smtp(smtp_address, smtp_port, username, password)
         forward_msg = MIMEMultipart()
         forward_msg['From'] = username
