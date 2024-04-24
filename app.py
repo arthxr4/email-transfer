@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 def test_imap_connection(imap_address: str, username: str, password: str):
     """Endpoint to test IMAP connection."""
     try:
-        with Imbox(imap_address, username=username, password=password, ssl=True) as imbox:
+        with Imbox(imap_address, username=username, password=password, ssl=True, ssl_context=None, starttls=False) as imbox:
             if imbox.connection:
                 return {"status": "success", "message": "Successfully connected to the IMAP server."}
             else:
