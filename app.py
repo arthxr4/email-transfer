@@ -1,46 +1,38 @@
 from fastapi import FastAPI, HTTPException
 from imbox import Imbox
 import logging
-from datetime import datetime
 
 app = FastAPI()
 
-# Set up logging
+# Configurer le logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def parse_email_date(date_str):
-    try:
-        return datetime.strptime(date_str, '%a, %d %b %Y %H:%M:%S %z')
-    except ValueError:
-        return datetime.now()  # Fallback to current time if parsing fails
-
-@app.get("/fetch-latest-email")
-def fetch_latest_email(imap_address: str, username: str, password: str):
-    """Endpoint to fetch the latest email received."""
+@app.get("/fetch-emails-from")
+def fetch_emails_from(imap_address: str, username: str, password: str, sender_email: str):
+    """Endpoint to fetch emails sent from a specific email address."""
     try:
         with Imbox(imap_address, username=username, password=password, ssl=True) as imbox:
-            messages = imbox.messages()
-            sorted_messages = sorted(
-                ((uid, msg) for uid, msg in messages),
-                key=lambda x: parse_email_date(x[1].date),
-                reverse=True
-            )
-            if sorted_messages:
-                uid, message = sorted_messages[0]
-                email_data = {
+            # Fetch emails sent from a specific email address
+            messages = imbox.messages(sent_from=sender_email)
+            emails = []
+            for uid, message in messages:
+                email_info = {
                     "uid": uid,
                     "from": message.sent_from,
                     "to": message.sent_to,
                     "subject": message.subject,
                     "date": message.date,
-                    "headers": message.headers,
-                    "html_body": message.body['html'][0] if message.body['html'] else "No HTML content available",
-                    "text_body": message.body['plain'][0] if message.body['plain'] else "No text content available"
+                    "plain_body": message.body['plain'][0] if message.body['plain'] else "No plain text content available",
+                    "html_body": message.body['html'][0] if message.body['html'] else "No HTML content available"
                 }
-                return {"status": "success", "email": email_data}
-            return {"status": "failure", "message": "No emails found."}
+                emails.append(email_info)
+
+            if emails:
+                return {"status": "success", "emails": emails}
+            else:
+                return {"status": "failure", "message": "No emails found from the specified sender."}
     except Exception as e:
-        logging.error("An error occurred while trying to fetch the latest email:", exc_info=True)
+        logging.error("An error occurred while trying to fetch emails:", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
