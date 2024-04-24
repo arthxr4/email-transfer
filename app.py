@@ -11,15 +11,15 @@ def connect_to_imap(imap_address, username, password):
     mail = imaplib.IMAP4_SSL(imap_address)
     try:
         mail.login(username, password)
-        mail.select('inbox')  # connect and select inbox
+        mail.select('inbox')
         return mail
     except imaplib.IMAP4.error as e:
         raise HTTPException(status_code=500, detail=f"IMAP login failed: {e}")
 
 def connect_to_smtp(smtp_address, smtp_port, username, password):
     server = smtplib.SMTP(smtp_address, smtp_port)
-    server.starttls()  # start TLS for security
     try:
+        server.starttls()  # Secure the connection
         server.login(username, password)
         return server
     except smtplib.SMTPException as e:
@@ -37,15 +37,13 @@ async def forward_email(imap_address: str, username: str, password: str, uid: st
         raw_email = data[0][1]
         email_msg = message_from_bytes(raw_email)
 
-        # Set up SMTP to forward the email
         smtp_server = connect_to_smtp(smtp_address, smtp_port, username, password)
         forward_msg = MIMEMultipart("alternative")
-        forward_msg['From'] = email_msg.get('From')  # preserve original sender
+        forward_msg['From'] = username  # Use your own email address here
         forward_msg['To'] = receiver_address
         forward_msg['Subject'] = "Fwd: " + email_msg.get('Subject', '')
-        forward_msg['Reply-To'] = email_msg.get('From')  # ensure replies go to the original sender
+        forward_msg['Reply-To'] = email_msg.get('From')  # Preserve the original sender in Reply-To
 
-        # Attach the original email content
         if email_msg.is_multipart():
             for part in email_msg.walk():
                 if part.get_content_type() == 'text/plain' or part.get_content_type() == 'text/html':
