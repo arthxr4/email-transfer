@@ -17,9 +17,8 @@ def connect_to_imap(imap_address, username, password):
         raise HTTPException(status_code=500, detail=f"IMAP login failed: {e}")
 
 def connect_to_smtp(smtp_address, smtp_port, username, password):
-    server = smtplib.SMTP(smtp_address, smtp_port)
+    server = smtplib.SMTP_SSL(smtp_address, smtp_port)
     try:
-        server.starttls()  # Secure the connection
         server.login(username, password)
         return server
     except smtplib.SMTPException as e:
@@ -39,21 +38,25 @@ async def forward_email(imap_address: str, username: str, password: str, uid: st
 
         smtp_server = connect_to_smtp(smtp_address, smtp_port, username, password)
         forward_msg = MIMEMultipart("alternative")
-        forward_msg['From'] = username  # Use your own email address here
+        forward_msg['From'] = username  # Use your own email address
         forward_msg['To'] = receiver_address
         forward_msg['Subject'] = "Fwd: " + email_msg.get('Subject', '')
-        forward_msg['Reply-To'] = email_msg.get('From')  # Preserve the original sender in Reply-To
+        forward_msg['Reply-To'] = username  # Replies to this email go to your address
 
+        # No body content in the main message, just the history
+        forward_msg.attach(MIMEText("", 'html'))
+
+        # Attach the original email content as quoted history
         if email_msg.is_multipart():
             for part in email_msg.walk():
-                if part.get_content_type() == 'text/plain' or part.get_content_type() == 'text/html':
-                    body_content = part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
-                    body_part = MIMEText(body_content, 'html')
-                    forward_msg.attach(body_part)
+                if part.get_content_type() == 'text/html':
+                    html_content = part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
+                    quoted_html = f"<blockquote>{html_content}</blockquote>"
+                    forward_msg.attach(MIMEText(quoted_html, 'html'))
         else:
-            body_content = email_msg.get_payload(decode=True).decode(email_msg.get_content_charset('iso-8859-1'), errors='replace')
-            body_part = MIMEText(body_content, 'html')
-            forward_msg.attach(body_part)
+            html_content = email_msg.get_payload(decode=True).decode(email_msg.get_content_charset('iso-8859-1'), errors='replace')
+            quoted_html = f"<blockquote>{html_content}</blockquote>"
+            forward_msg.attach(MIMEText(quoted_html, 'html'))
 
         smtp_server.send_message(forward_msg)
         smtp_server.quit()
