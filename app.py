@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 import imaplib
-from email.parser import BytesParser
+from email import message_from_bytes
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -26,7 +26,7 @@ def connect_to_smtp(smtp_address, smtp_port, username, password):
 
 @app.post("/fetch-and-send-email-as-reply/")
 def fetch_and_send_email_as_reply(imap_address: str, username: str, password: str, uid: str, smtp_address: str, smtp_port: int, receiver_address: str, personal_message: str):
-    """Endpoint to fetch an HTML email content by UID and send it as a reply with a personal message to another email address."""
+    """Endpoint to fetch an email by UID and send it as a reply with a personal message to another email address."""
     mail = connect_to_imap(imap_address, username, password)
     try:
         result, data = mail.uid('fetch', uid, '(RFC822)')
@@ -34,23 +34,29 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
             raise HTTPException(status_code=404, detail="Email not found")
 
         raw_email = data[0][1]
-        msg = BytesParser().parsebytes(raw_email)
+        email_msg = message_from_bytes(raw_email)
+
+        # Extract content
+        content = ""
+        if email_msg.is_multipart():
+            for part in email_msg.walk():
+                if part.get_content_type() == 'text/plain':
+                    content += part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8')
+        else:
+            content = email_msg.get_payload(decode=True).decode(email_msg.get_content_charset() or 'utf-8')
 
         smtp_server = connect_to_smtp(smtp_address, smtp_port, username, password)
         forward_msg = MIMEMultipart("alternative")
         forward_msg['From'] = username
         forward_msg['To'] = receiver_address
-        forward_msg['Subject'] = "RE: " + msg.get('Subject', '')
-        forward_msg['In-Reply-To'] = msg.get('Message-ID')
-        forward_msg['References'] = msg.get('References', msg.get('Message-ID'))
+        forward_msg['Subject'] = "RE: " + email_msg.get('Subject', '')
+        forward_msg['In-Reply-To'] = email_msg.get('Message-ID')
+        forward_msg['References'] = email_msg.get('References', email_msg.get('Message-ID'))
 
-        # Personal message at the top
         personal_msg_part = MIMEText(f"test: {personal_message}\n\n", 'plain')
         forward_msg.attach(personal_msg_part)
 
-        # Format the original email content as a quoted text
-        original_content = msg.get_payload(decode=True)
-        quoted_content = "\n".join([f"> {line}" for line in original_content.splitlines()])
+        quoted_content = "\n".join([f"> {line}" for line in content.splitlines()])
         quoted_part = MIMEText(quoted_content, 'plain')
         forward_msg.attach(quoted_part)
 
@@ -63,7 +69,7 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
     finally:
         mail.logout()
 
-# Pour exécuter l'API localement
+# To run the API locally
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
