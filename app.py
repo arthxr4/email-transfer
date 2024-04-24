@@ -57,8 +57,18 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         forward_msg.attach(personal_msg_part)
 
         # Attach the original email content
-        html_part = MIMEText(msg.get_payload(decode=True), 'html')
-        forward_msg.attach(html_part)
+        html_content = None
+        for part in msg.walk():
+            if part.get_content_type() == 'text/html':
+                html_content = part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
+
+        if html_content:
+            html_part = MIMEText(html_content, 'html')
+            forward_msg.attach(html_part)
+        else:
+            print("No HTML part found; using plain text as fallback.")
+            text_part = MIMEText("Original message was in a format not supported here.", 'plain')
+            forward_msg.attach(text_part)
 
         smtp_server.send_message(forward_msg)
         smtp_server.quit()
