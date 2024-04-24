@@ -10,6 +10,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 @app.get("/fetch-email-by-uid")
 def fetch_email_by_uid(imap_address: str, username: str, password: str, email_uid: str):
     """Endpoint to fetch email details by UID."""
+    logging.info(f"Attempting to fetch email with UID: {email_uid}")
     try:
         with Imbox(imap_address, username=username, password=password, ssl=True) as imbox:
             # Fetch a specific email by UID
