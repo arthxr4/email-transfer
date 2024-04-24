@@ -1,6 +1,5 @@
-textblob
 fastapi
 uvicorn
-flask
-numpi
+numpy
+scipy
 matplotlib
