@@ -46,10 +46,10 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
 
         # Simple text formatting for forwarded message header
         header_content = f"""\
----------- Forwarded message ----------
-From: {email_msg.get('From')}
-Date: {email_msg.get('Date')}
-To: {username}
+---------- Forwarded message ----------<br>
+From: {email_msg.get('From')}<br>
+Date: {email_msg.get('Date')}<br>
+To: {username}<br>
 Subject: {email_msg.get('Subject')}
 """
 
