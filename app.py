@@ -50,7 +50,7 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
 From: {email_msg.get('From')}<br>
 Date: {email_msg.get('Date')}<br>
 To: {username}<br>
-Subject: {email_msg.get('Subject')}
+Subject: {email_msg.get('Subject')}<br>
 """
 
         # Attach the original email content below the header
