@@ -46,12 +46,19 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
 
         # Create a formatted HTML content for the forwarded message
         html_content = f"""\
-        ---------- Forwarded message ----------
-        From: {email_msg.get('From')}
-        Date: {email_msg.get('Date')}
-        To: {username} /* Change this to actual receiver if needed */
-        Subject: {email_msg.get('Subject')}
-
+        <html>
+        <head>
+        <style>
+        strong {{font-weight: bold;}}
+        </style>
+        </head>
+        <body>
+        <p>---------- Forwarded message ----------</p>
+        <p><strong>From:</strong> {email_msg.get('From')}</p>
+        <p><strong>Date:</strong> {email_msg.get('Date')}</p>
+        <p><strong>To:</strong> {username} /* Change this to actual receiver if needed */</p>
+        <p><strong>Subject:</strong> {email_msg.get('Subject')}</p>
+        <br/>
         """
         if email_msg.is_multipart():
             for part in email_msg.walk():
