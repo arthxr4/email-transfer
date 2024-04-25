@@ -57,13 +57,15 @@ Subject: {email_msg.get('Subject')}
         body_content = header_content
         if email_msg.is_multipart():
             for part in email_msg.walk():
-                if part.get_content_type() == 'text/plain':
-                    body_content += "\n" + part.get_payload(decode=True).decode(part.get_content_charset('utf-8'), errors='replace')
+                if part.get_content_type() == 'text/html':
+                    # This ensures we keep the HTML formatting of the original email
+                    body_content += part.get_payload(decode=True).decode(part.get_content_charset('utf-8'), errors='replace')
         else:
-            if email_msg.get_content_type() == 'text/plain':
-                body_content += "\n" + email_msg.get_payload(decode=True).decode(email_msg.get_content_charset('utf-8'), errors='replace')
+            if email_msg.get_content_type() == 'text/html':
+                body_content += email_msg.get_payload(decode=True).decode(email_msg.get_content_charset('utf-8'), errors='replace')
 
-        forward_msg.attach(MIMEText(body_content, 'plain'))
+        forward_msg.attach(MIMEText(body_content, 'html'))  # 'html' instead of 'plain'
+
 
         smtp_server.send_message(forward_msg)
         smtp_server.quit()
