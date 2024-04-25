@@ -50,8 +50,7 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         forward_msg['In-Reply-To'] = email_msg.get('Message-ID')
         forward_msg['References'] = email_msg.get('References', email_msg.get('Message-ID'))
 
-        personal_msg_part = MIMEText(f"test: {personal_message}\n\n", 'html')
-        forward_msg.attach(personal_msg_part)
+        
 
         # Append the HTML content of the original email, formatted as quoted
         html_content = "<p>Responding to your message from " + email_date + " sent by " + email_sender + ":</p>"
