@@ -25,8 +25,8 @@ def connect_to_smtp(smtp_address, smtp_port, username, password):
         raise HTTPException(status_code=500, detail=f"SMTP login failed: {e}")
 
 @app.post("/fetch-and-send-email-as-reply/")
-def fetch_and_send_email_as_reply(imap_address: str, username: str, password: str, uid: str, smtp_address: str, smtp_port: int, receiver_addresses: str, bcc_addresses: str):
-    """Endpoint to fetch an email by UID and send it as a reply with a formatted transfer to multiple email addresses in To and BCC."""
+def fetch_and_send_email_as_reply(imap_address: str, username: str, password: str, uid: str, smtp_address: str, smtp_port: int, receiver_addresses: str):
+    """Endpoint to fetch an email by UID and send it as a reply with a simple formatted header to simulate a forwarded email."""
     mail = connect_to_imap(imap_address, username, password)
     try:
         result, data = mail.uid('fetch', uid, '(RFC822)')
@@ -37,45 +37,37 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         email_msg = message_from_bytes(raw_email)
 
         smtp_server = connect_to_smtp(smtp_address, smtp_port, username, password)
-        forward_msg = MIMEMultipart("alternative")
+        forward_msg = MIMEMultipart()
         forward_msg['From'] = username
-        forward_msg['To'] = receiver_addresses  # Multiple To email addresses
-        forward_msg['Bcc'] = bcc_addresses  # Multiple BCC email addresses
+        forward_msg['To'] = receiver_addresses
         forward_msg['Subject'] = "Fwd: " + email_msg.get('Subject', '')
-        forward_msg['Reply-To'] = username  # Ensure replies go to your address
+        forward_msg['Reply-To'] = email_msg.get('From')
 
-        # Create a formatted HTML content for the forwarded message
-        html_content = f"""\
-        <html>
-        <head>
-        <style>
-        strong {{font-weight: bold;}}
-        </style>
-        </head>
-        <body>
-        <p>---------- Forwarded message ----------</p>
-        <p><strong>From:</strong> {email_msg.get('From')}</p>
-        <p><strong>Date:</strong> {email_msg.get('Date')}</p>
-        <p><strong>To:</strong> {username} /* Change this to actual receiver if needed */</p>
-        <p><strong>Subject:</strong> {email_msg.get('Subject')}</p>
-        <br/>
-        """
+        # Simple text formatting for forwarded message header
+        header_content = f"""\
+---------- Forwarded message ----------
+From: {email_msg.get('From')}
+Date: {email_msg.get('Date')}
+To: {receiver_addresses}
+Subject: {email_msg.get('Subject')}
+"""
+
+        # Attach the original email content below the header
+        body_content = header_content
         if email_msg.is_multipart():
             for part in email_msg.walk():
-                if part.get_content_type() == 'text/html':
-                    part_content = part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
-                    html_content += f"<div>{part_content}</div>"
+                if part.get_content_type() == 'text/plain':
+                    body_content += "\n" + part.get_payload(decode=True).decode(part.get_content_charset('utf-8'), errors='replace')
         else:
-            if email_msg.get_content_type() == 'text/html':
-                part_content = email_msg.get_payload(decode=True).decode(email_msg.get_content_charset('iso-8859-1'), errors='replace')
-                html_content += f"<div>{part_content}</div>"
+            if email_msg.get_content_type() == 'text/plain':
+                body_content += "\n" + email_msg.get_payload(decode=True).decode(email_msg.get_content_charset('utf-8'), errors='replace')
 
-        forward_msg.attach(MIMEText(html_content, 'html'))
+        forward_msg.attach(MIMEText(body_content, 'plain'))
 
         smtp_server.send_message(forward_msg)
         smtp_server.quit()
 
-        return {"status": "success", "message_content": html_content}
+        return {"status": "success", "message": "Email fetched and forwarded successfully"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
     finally:
