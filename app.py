@@ -48,7 +48,7 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
 ---------- Forwarded message ----------
 From: {email_msg.get('From')}
 Date: {email_msg.get('Date')}
-To: {receiver_addresses}
+To: {username}
 Subject: {email_msg.get('Subject')}
 """
 
