@@ -40,29 +40,22 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         forward_msg = MIMEMultipart("alternative")
         forward_msg['From'] = username
         forward_msg['To'] = receiver_address
-        forward_msg['Subject'] = "RE: " + email_msg.get('Subject', '')
-        forward_msg['Reply-To'] = username  # Ensure replies go to your address
+        forward_msg['Subject'] = "Fwd: " + email_msg.get('Subject', '')
+        forward_msg['Reply-To'] = username  # Replies should go to your address
 
-        # Create a formatted HTML content for the forwarded message
+        # Add custom headers to include original sender and date info as metadata
+        forward_msg.add_header('X-Original-From', email_msg.get('From'))
+        forward_msg.add_header('X-Original-Date', email_msg.get('Date'))
+
         if email_msg.is_multipart():
             for part in email_msg.walk():
                 if part.get_content_type() == 'text/html':
                     html_content = part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
-                    formatted_html = f"""
-                    <p>Originally from: {email_msg.get('From')}</p>
-                    <p>Date: {email_msg.get('Date')}</p>
-                    <blockquote>{html_content}</blockquote>
-                    """
-                    forward_msg.attach(MIMEText(formatted_html, 'html'))
+                    forward_msg.attach(MIMEText(html_content, 'html'))
         else:
             if email_msg.get_content_type() == 'text/html':
                 html_content = email_msg.get_payload(decode=True).decode(email_msg.get_content_charset('iso-8859-1'), errors='replace')
-                formatted_html = f"""
-                <p>Originally from: {email_msg.get('From')}</p>
-                <p>Date: {email_msg.get('Date')}</p>
-                <blockquote>{html_content}</blockquote>
-                """
-                forward_msg.attach(MIMEText(formatted_html, 'html'))
+                forward_msg.attach(MIMEText(html_content, 'html'))
 
         # Convert the message to a string to view it
         message_str = forward_msg.as_string()
