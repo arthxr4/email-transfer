@@ -25,8 +25,8 @@ def connect_to_smtp(smtp_address, smtp_port, username, password):
         raise HTTPException(status_code=500, detail=f"SMTP login failed: {e}")
 
 @app.post("/fetch-and-send-email-as-reply/")
-def fetch_and_send_email_as_reply(imap_address: str, username: str, password: str, uid: str, smtp_address: str, smtp_port: int, receiver_address: str):
-    """Endpoint to fetch an email by UID and send it as a reply with a personal message to another email address."""
+def fetch_and_send_email_as_reply(imap_address: str, username: str, password: str, uid: str, smtp_address: str, smtp_port: int, to_addresses: str, bcc_addresses: str):
+    """Endpoint to fetch an email by UID and send it as a reply with a personal message to multiple email addresses in To and BCC."""
     mail = connect_to_imap(imap_address, username, password)
     try:
         result, data = mail.uid('fetch', uid, '(RFC822)')
@@ -36,24 +36,17 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         raw_email = data[0][1]
         email_msg = message_from_bytes(raw_email)
 
-        # Extract sender email and other details
-        email_sender = email_msg.get('From')
-        email_subject = email_msg.get('Subject', '')
-        email_date = email_msg.get('Date', '')
-
         smtp_server = connect_to_smtp(smtp_address, smtp_port, username, password)
         forward_msg = MIMEMultipart("alternative")
         forward_msg['From'] = username
-        forward_msg['To'] = receiver_address
-        forward_msg['Subject'] = "RE: " + email_subject
-        forward_msg['Reply-To'] = email_sender  # Set Reply-To as the original sender
+        forward_msg['To'] = to_addresses  # Multiple To email addresses
+        forward_msg['Bcc'] = bcc_addresses  # Multiple BCC email addresses
+        forward_msg['Subject'] = "RE: " + email_msg.get('Subject', '')
+        forward_msg['Reply-To'] = email_msg.get('From')
         forward_msg['In-Reply-To'] = email_msg.get('Message-ID')
         forward_msg['References'] = email_msg.get('References', email_msg.get('Message-ID'))
 
-        
-
-        # Append the HTML content of the original email, formatted as quoted
-        html_content = "<p>Responding to your message from " + email_date + " sent by " + email_sender + ":</p>"
+        html_content = "<p>Responding to your message from " + email_msg.get('Date', '') + " sent by " + email_msg.get('From', '') + ":</p>"
         if email_msg.is_multipart():
             for part in email_msg.walk():
                 if part.get_content_type() == 'text/html':
@@ -69,7 +62,7 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         smtp_server.send_message(forward_msg)
         smtp_server.quit()
 
-        return {"status": "success", "message": "Email fetched and replied with personal message successfully"}
+        return {"status": "success", "message": "Email fetched and replied with personal message successfully to To and BCC recipients"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
     finally:
