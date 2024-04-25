@@ -60,7 +60,7 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         # Convert the message to a string before sending
         message_str = forward_msg.as_string()
         # Optionally send the message
-        # smtp_server.send_message(forward_msg)
+        smtp_server.send_message(forward_msg)
         smtp_server.quit()
 
         return {"status": "success", "message_content": message_str}
