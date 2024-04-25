@@ -25,7 +25,7 @@ def connect_to_smtp(smtp_address, smtp_port, username, password):
         raise HTTPException(status_code=500, detail=f"SMTP login failed: {e}")
 
 @app.post("/fetch-and-send-email-as-reply/")
-def fetch_and_send_email_as_reply(imap_address: str, username: str, password: str, uid: str, smtp_address: str, smtp_port: int, receiver_address: str, personal_message: str):
+def fetch_and_send_email_as_reply(imap_address: str, username: str, password: str, uid: str, smtp_address: str, smtp_port: int, receiver_address: str):
     """Endpoint to fetch an email by UID and send it as a reply with a personal message to another email address."""
     mail = connect_to_imap(imap_address, username, password)
     try:
