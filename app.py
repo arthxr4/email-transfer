@@ -43,31 +43,36 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         forward_msg['Subject'] = "Fwd: " + email_msg.get('Subject', '')
         forward_msg['Reply-To'] = username  # Ensure replies go to your address
 
-        # Construct the forwarded content with headers for each part of the thread
-        formatted_content = '------------------------------------------------------------------\n'
-        formatted_content += '---------- Message transféré ----------\n'
-        formatted_content += f"De : {email_msg.get('From')}\n"
-        formatted_content += f"Date : {email_msg.get('Date')}\n"
-        formatted_content += f"À : {email_msg.get('To')}\n"
-        formatted_content += f"Objet : {email_msg.get('Subject')}\n\n"
+        # Creating a formatted content for the forwarded message
+        html_content = f"""\
+        <html>
+        <head></head>
+        <body>
+        <p>------------------------------------------------------------------</p>
+        <p>---------- Message transféré ----------</p>
+        <p><strong>De:</strong> {email_msg.get('From')}</p>
+        <p><strong>Date:</strong> {email_msg.get('Date')}</p>
+        <p><strong>À:</strong> {email_msg.get('To')}</p>
+        <p><strong>Objet:</strong> {email_msg.get('Subject')}</p>
+        """
 
-        # Append the body of the email
         if email_msg.is_multipart():
             for part in email_msg.walk():
                 if part.get_content_type() == 'text/html':
-                    html_content = part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
-                    formatted_content += f"{html_content}\n\n"
+                    part_content = part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
+                    html_content += f"<blockquote>{part_content}</blockquote>"
         else:
             if email_msg.get_content_type() == 'text/html':
-                html_content = email_msg.get_payload(decode=True).decode(email_msg.get_content_charset('iso-8859-1'), errors='replace')
-                formatted_content += f"{html_content}\n\n"
+                part_content = email_msg.get_payload(decode=True).decode(email_msg.get_content_charset('iso-8859-1'), errors='replace')
+                html_content += f"<blockquote>{part_content}</blockquote>"
 
-        forward_msg.attach(MIMEText(formatted_content, 'html'))
+        html_content += "</body></html>"
+        forward_msg.attach(MIMEText(html_content, 'html'))
 
         smtp_server.send_message(forward_msg)
         smtp_server.quit()
 
-        return {"status": "success", "message_content": formatted_content}
+        return {"status": "success", "message_content": html_content}
     except Exception as e:
         return {"status": "error", "message": str(e)}
     finally:
