@@ -41,25 +41,31 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         forward_msg['From'] = username
         forward_msg['To'] = receiver_address
         forward_msg['Subject'] = "RE: " + email_msg.get('Subject', '')
-        forward_msg['Reply-To'] = email_msg.get('From')
-        forward_msg['In-Reply-To'] = email_msg.get('Message-ID')
-        forward_msg['References'] = email_msg.get('References', email_msg.get('Message-ID'))
+        forward_msg['Reply-To'] = username  # Ensure replies go to your address
 
-  
-
+        # Create a formatted HTML content for the forwarded message
         if email_msg.is_multipart():
             for part in email_msg.walk():
                 if part.get_content_type() == 'text/html':
                     html_content = part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
-                    forward_msg.attach(MIMEText(f"<blockquote>{html_content}</blockquote>", 'html'))
+                    formatted_html = f"""
+                    <p>Originally from: {email_msg.get('From')}</p>
+                    <p>Date: {email_msg.get('Date')}</p>
+                    <blockquote>{html_content}</blockquote>
+                    """
+                    forward_msg.attach(MIMEText(formatted_html, 'html'))
         else:
             if email_msg.get_content_type() == 'text/html':
                 html_content = email_msg.get_payload(decode=True).decode(email_msg.get_content_charset('iso-8859-1'), errors='replace')
-                forward_msg.attach(MIMEText(f"<blockquote>{html_content}</blockquote>", 'html'))
+                formatted_html = f"""
+                <p>Originally from: {email_msg.get('From')}</p>
+                <p>Date: {email_msg.get('Date')}</p>
+                <blockquote>{html_content}</blockquote>
+                """
+                forward_msg.attach(MIMEText(formatted_html, 'html'))
 
-        # Convert the message to a string before sending
+        # Convert the message to a string to view it
         message_str = forward_msg.as_string()
-        # Optionally send the message
         smtp_server.send_message(forward_msg)
         smtp_server.quit()
 
