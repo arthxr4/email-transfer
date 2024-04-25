@@ -45,8 +45,7 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         forward_msg['In-Reply-To'] = email_msg.get('Message-ID')
         forward_msg['References'] = email_msg.get('References', email_msg.get('Message-ID'))
 
-        personal_msg_part = MIMEText(f"test: {personal_message}\n\n", 'html')
-        forward_msg.attach(personal_msg_part)
+  
 
         if email_msg.is_multipart():
             for part in email_msg.walk():
