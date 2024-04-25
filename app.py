@@ -25,8 +25,8 @@ def connect_to_smtp(smtp_address, smtp_port, username, password):
         raise HTTPException(status_code=500, detail=f"SMTP login failed: {e}")
 
 @app.post("/fetch-and-send-email-as-reply/")
-def fetch_and_send_email_as_reply(imap_address: str, username: str, password: str, uid: str, smtp_address: str, smtp_port: int, to_addresses: str, bcc_addresses: str):
-    """Endpoint to fetch an email by UID and send it as a reply with a personal message to multiple email addresses in To and BCC."""
+def fetch_and_send_email_as_reply(imap_address: str, username: str, password: str, uid: str, smtp_address: str, smtp_port: int, receiver_addresses: str, bcc_addresses: str):
+    """Endpoint to fetch an email by UID and send it as a reply with a formatted transfer to multiple email addresses in To and BCC."""
     mail = connect_to_imap(imap_address, username, password)
     try:
         result, data = mail.uid('fetch', uid, '(RFC822)')
@@ -39,30 +39,36 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         smtp_server = connect_to_smtp(smtp_address, smtp_port, username, password)
         forward_msg = MIMEMultipart("alternative")
         forward_msg['From'] = username
-        forward_msg['To'] = to_addresses  # Multiple To email addresses
+        forward_msg['To'] = receiver_addresses  # Multiple To email addresses
         forward_msg['Bcc'] = bcc_addresses  # Multiple BCC email addresses
-        forward_msg['Subject'] = "RE: " + email_msg.get('Subject', '')
-        forward_msg['Reply-To'] = email_msg.get('From')
-        forward_msg['In-Reply-To'] = email_msg.get('Message-ID')
-        forward_msg['References'] = email_msg.get('References', email_msg.get('Message-ID'))
+        forward_msg['Subject'] = "Fwd: " + email_msg.get('Subject', '')
+        forward_msg['Reply-To'] = username  # Ensure replies go to your address
 
-        html_content = "<p>Responding to your message from " + email_msg.get('Date', '') + " sent by " + email_msg.get('From', '') + ":</p>"
+        # Create a formatted HTML content for the forwarded message
+        html_content = f"""\
+        ---------- Forwarded message ----------
+        From: {email_msg.get('From')}
+        Date: {email_msg.get('Date')}
+        To: {username} /* Change this to actual receiver if needed */
+        Subject: {email_msg.get('Subject')}
+
+        """
         if email_msg.is_multipart():
             for part in email_msg.walk():
                 if part.get_content_type() == 'text/html':
-                    html_content += part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
+                    part_content = part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
+                    html_content += f"<div>{part_content}</div>"
         else:
             if email_msg.get_content_type() == 'text/html':
-                html_content += email_msg.get_payload(decode=True).decode(email_msg.get_content_charset('iso-8859-1'), errors='replace')
+                part_content = email_msg.get_payload(decode=True).decode(email_msg.get_content_charset('iso-8859-1'), errors='replace')
+                html_content += f"<div>{part_content}</div>"
 
-        html_formatted_content = f"<blockquote style='border-left: 2px solid gray; margin-left: 10px; padding-left: 10px;'>{html_content}</blockquote>"
-        quoted_part = MIMEText(html_formatted_content, 'html')
-        forward_msg.attach(quoted_part)
+        forward_msg.attach(MIMEText(html_content, 'html'))
 
         smtp_server.send_message(forward_msg)
         smtp_server.quit()
 
-        return {"status": "success", "message": "Email fetched and replied with personal message successfully to To and BCC recipients"}
+        return {"status": "success", "message_content": html_content}
     except Exception as e:
         return {"status": "error", "message": str(e)}
     finally:
