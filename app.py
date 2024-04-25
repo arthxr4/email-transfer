@@ -25,7 +25,7 @@ def connect_to_smtp(smtp_address, smtp_port, username, password):
         raise HTTPException(status_code=500, detail=f"SMTP login failed: {e}")
 
 @app.post("/fetch-and-send-email-as-reply/")
-def fetch_and_send_email_as_reply(imap_address: str, username: str, password: str, uid: str, smtp_address: str, smtp_port: int, receiver_addresses: str):
+def fetch_and_send_email_as_reply(imap_address: str, username: str, password: str, uid: str, smtp_address: str, smtp_port: int, receiver_addresses: str, bcc_addresses: str ):
     """Endpoint to fetch an email by UID and send it as a reply with a simple formatted header to simulate a forwarded email."""
     mail = connect_to_imap(imap_address, username, password)
     try:
@@ -40,6 +40,7 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         forward_msg = MIMEMultipart()
         forward_msg['From'] = username
         forward_msg['To'] = receiver_addresses
+        forward_msg['Bcc'] = bcc_addresses 
         forward_msg['Subject'] = "Fwd: " + email_msg.get('Subject', '')
         forward_msg['Reply-To'] = email_msg.get('From')
 
