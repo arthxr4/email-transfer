@@ -43,25 +43,24 @@ def fetch_and_send_email_as_reply(imap_address: str, username: str, password: st
         forward_msg['Subject'] = "Fwd: " + email_msg.get('Subject', '')
         forward_msg['Reply-To'] = username  # Ensure replies go to your address
 
-        # Create a formatted HTML content for the forwarded message
-        formatted_content = f"""\
-------------------------------------------------------------------
----------- Message transféré ----------
-De : {email_msg.get('From')}
-Date : {email_msg.get('Date')}
-À : {receiver_address}
-Objet : {email_msg.get('Subject')}
+        # Construct the forwarded content with headers for each part of the thread
+        formatted_content = '------------------------------------------------------------------\n'
+        formatted_content += '---------- Message transféré ----------\n'
+        formatted_content += f"De : {email_msg.get('From')}\n"
+        formatted_content += f"Date : {email_msg.get('Date')}\n"
+        formatted_content += f"À : {email_msg.get('To')}\n"
+        formatted_content += f"Objet : {email_msg.get('Subject')}\n\n"
 
-"""
+        # Append the body of the email
         if email_msg.is_multipart():
             for part in email_msg.walk():
                 if part.get_content_type() == 'text/html':
                     html_content = part.get_payload(decode=True).decode(part.get_content_charset('iso-8859-1'), errors='replace')
-                    formatted_content += f"<blockquote>{html_content}</blockquote>"
+                    formatted_content += f"{html_content}\n\n"
         else:
             if email_msg.get_content_type() == 'text/html':
                 html_content = email_msg.get_payload(decode=True).decode(email_msg.get_content_charset('iso-8859-1'), errors='replace')
-                formatted_content += f"<blockquote>{html_content}</blockquote>"
+                formatted_content += f"{html_content}\n\n"
 
         forward_msg.attach(MIMEText(formatted_content, 'html'))
 
